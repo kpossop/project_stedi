@@ -38,8 +38,11 @@ Hudi (Hadoop Upsert Delete Incremental) es un framework que permite realizar esc
     │   ├── landing_zone
     │   │   ├── Crawlers Landing.png  # Imagen de los crawlers utilizados para catalogar la zona de aterrizaje.
     │   │   ├── accelerometer_landing.png  # Vista de datos de la tabla `accelerometer_landing`.
+    │   │   ├── accelerometer_landing-count.png  # Conteo de registros en la tabla `accelerometer_landing`.
     │   │   ├── customer_landing.png  # Vista de datos de la tabla `customer_landing`.
-    │   │   └── step_trainer_landing.png  # Vista de datos de la tabla `step_trainer_landing`.
+    │   │   ├── customer_landing-count.png  # Conteo de registros en la tabla `customer_landing`.
+    │   │   ├── step_trainer_landing.png  # Vista de datos de la tabla `step_trainer_landing`.
+    │   │   └── step_trainer_landing-count.png  # Conteo de registros en la tabla `step_trainer_landing`.
     │   ├── s3_bucket
     │   │   ├── accelerometer.png  # Captura de los datos del bucket S3 para `accelerometer`.
     │   │   ├── customer.png  # Captura de los datos del bucket S3 para `customer`.
