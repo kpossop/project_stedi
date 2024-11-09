@@ -25,28 +25,27 @@ class Trusted_tables():
         self.spark = spark
         self.glueContext = glueContext
         
-    def read_from_catalog(self, database: str = "", table_name: str = ""):
+    def read_from_s3(self,path: str = ""):
         """
-        Reads data from the specified AWS Glue catalog table.
+    Reads data from a JSON file at the specified S3 path.
 
-        Args:
-            database (str): The name of the database in AWS Glue.
-            table_name (str): The name of the table in the database.
+    Args:
+        path (str): The path to the file in S3 from which data will be read.
 
-        Returns:
-            DataFrame: A DataFrame containing the data read from the catalog.
+    Returns:
+        DataFrame: A PySpark DataFrame containing the data read from S3.
 
-        Raises:
-            RuntimeError: If reading from the catalog fails.
-        """
+    Raises:
+        RuntimeError: If reading from S3 fails.
+    """
 
         try:
             
-            df: DataFrame = self.glueContext.create_data_frame.from_catalog(database=database, table_name=table_name)
+            df: DataFrame = self.spark.read.json(f"s3://{path}")
             return df
                  
         except Exception as e:
-            raise RuntimeError(f"ERROR: Failed to read from catalog {database}.{table_name}: {str(e)}") 
+            raise RuntimeError(f"ERROR: Failed to read from s3 {path}: {str(e)}") 
     
     def write_hudi_table(self,df, table_name, record_key, precombine_field, path, database_name="stedi_trusted"):
         """
@@ -95,61 +94,20 @@ class Trusted_tables():
         """
         Processes and filters data from the landing zone to the trusted zone.
 
-        Reads data from the customer, accelerometer, and step trainer landing 
+        Reads data from the customer landing 
         tables, filters the records to keep only relevant data, and writes 
         the processed DataFrames to the trusted zone in Hudi format.
         """
         
         # Leer datos de la zona de aterrizaje
-        customer_landing_df = self.read_from_catalog("stedi_landing","customer_landing")
-        
-        accelerometer_landing_df = self.read_from_catalog("stedi_landing","accelerometer_landing")
-        step_trainer_landing_df = self.read_from_catalog("stedi_landing","step_trainer_landing")
+        customer_landing_df = self.read_from_s3("test-lake-house/customer/landing/customer-1691348231425.json")
         
         # Procesar customer_landing para customer_trusted
         customer_trusted_df = (customer_landing_df
                                 .filter(F.col("sharewithresearchasofdate").isNotNull())
                              )
-        
         self.write_hudi_table(customer_trusted_df, "customer_trusted", "serialnumber", "registrationdate","test-lake-house/customer/trusted/")
-        
-        # Procesar accelerometer_landing para accelerometer_trusted
-        # Definir la ventana particionada por 'user' y ordenada por 'timestamp'
-        window_spec = Window.partitionBy("user").orderBy("timestamp")
-        accelerometer_trusted_df = accelerometer_landing_df.join(
-            customer_trusted_df,
-            accelerometer_landing_df["user"] == customer_trusted_df["email"],
-            "inner"
-        ).select(
-            accelerometer_landing_df["user"],
-            accelerometer_landing_df["timestamp"],
-            accelerometer_landing_df["x"],
-            accelerometer_landing_df["y"],
-            accelerometer_landing_df["z"]
-        ).withColumn(
-            "rn", F.row_number().over(window_spec)
-        )
 
-        self.write_hudi_table(accelerometer_trusted_df, "accelerometer_trusted", "user,rn", "timestamp","test-lake-house/accelerometer/trusted/")
-        
-        # Definir la ventana particionada por 'serialnumber' y ordenada por 'sensorreadingtime'
-        window_spec_step = Window.partitionBy("serialnumber").orderBy("sensorreadingtime")
-        # Procesar step_trainer_landing para step_trainer_trusted
-        step_trainer_trusted_df = step_trainer_landing_df.join(
-            customer_trusted_df,
-            step_trainer_landing_df["serialnumber"] == customer_trusted_df["serialnumber"],
-            "inner"
-        ).select(
-            step_trainer_landing_df["sensorreadingtime"],
-            step_trainer_landing_df["serialnumber"],
-            step_trainer_landing_df["distancefromobject"]
-        ).withColumn(
-            "rn", F.row_number().over(window_spec_step)
-        )
-
-        self.write_hudi_table(step_trainer_trusted_df, "step_trainer_trusted", "serialnumber,rn", "sensorreadingtime","test-lake-house/step_trainer/trusted/")
-
-    
     def run(self):
         """Runs the process to filter and write data to the trusted zone."""
         self.filter_tables()
